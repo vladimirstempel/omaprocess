@@ -6,8 +6,6 @@ their real names and icons, "Chromium", "Zed", "Steam", instead of `chromium`
 times forty-seven. Expand a program to see its processes, and terminate either
 the whole program or a single process, always after a confirmation.
 
-> Status: in development.
-
 ## What it shows
 
 - **Applications**: everything you launched, grouped by the systemd scope
