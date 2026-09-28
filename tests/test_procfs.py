@@ -61,3 +61,19 @@ class ProcFsTest(unittest.TestCase):
         (self.root / "self").mkdir()
         self.proc.add(3, "zed")
         self.assertEqual(len(self.procfs.scan(1000)), 1)
+
+    def test_scan_does_not_parse_other_users_processes(self):
+        # Add a uid-0 process with garbage stat; scan should skip it without parsing
+        self.proc.add(7, "root_proc", uid=0)
+        (self.root / "7" / "stat").write_text("garbage")
+        self.proc.add(8, "my_proc")
+        # Scan should return only own process, not raise ValueError from _parse_stat
+        result = [p.pid for p in self.procfs.scan(1000)]
+        self.assertEqual(result, [Pid(8)])
+
+    def test_unparseable_stat_is_skipped(self):
+        # Add own-uid process with garbage stat; read/scan should skip it gracefully
+        self.proc.add(9, "broken")
+        (self.root / "9" / "stat").write_text("garbage")
+        self.assertIsNone(self.procfs.read(Pid(9)))
+        self.assertEqual([p.pid for p in self.procfs.scan(1000)], [])
