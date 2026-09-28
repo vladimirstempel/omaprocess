@@ -39,6 +39,7 @@ class TerminatorTest(unittest.TestCase):
         self.proc.add(20, "sleep", group="session-2.scope")
         self.proc.add(30, "sshd", uid=0, group="sshd.service")
         self.proc.add(40, "quickshell", group="wayland-wm@hyprland.desktop.service")
+        self.proc.add(41, "Hyprland", group="wayland-wm@hyprland.desktop.service")
 
     def terminator(self, recorder):
         policy = ProtectionPolicy(uid=1000, untouchable=frozenset())
@@ -64,10 +65,6 @@ class TerminatorTest(unittest.TestCase):
         with self.assertRaisesRegex(Refused, "protected"):
             self.terminator(Recorder()).stop_group(GroupKey("wayland-wm@hyprland.desktop.service"))
 
-    def test_unknown_group_is_refused(self):
-        with self.assertRaisesRegex(Refused, "no such"):
-            self.terminator(Recorder()).stop_group(GroupKey("app-nothing.scope"))
-
     def test_term_and_kill_send_signals(self):
         recorder = Recorder()
         terminator = self.terminator(recorder)
@@ -82,3 +79,27 @@ class TerminatorTest(unittest.TestCase):
     def test_process_that_is_already_gone_is_success(self):
         self.terminator(Recorder()).term(Pid(99))  # no /proc entry: nothing to end
         self.terminator(Recorder(gone={10})).term(Pid(10))  # exits between read and signal
+
+    def test_term_of_process_sharing_group_with_the_shell_is_refused(self):
+        # pid 41 ("Hyprland") is not itself protected, but shares its group
+        # (the wayland-wm systemd unit) with the quickshell process (pid 40).
+        recorder = Recorder()
+        with self.assertRaisesRegex(Refused, "protected"):
+            self.terminator(recorder).term(Pid(41))
+        self.assertEqual(recorder.signals, [])
+
+    def test_ending_a_group_that_is_already_gone_is_success(self):
+        recorder = Recorder()
+        self.terminator(recorder).stop_group(GroupKey("app-nothing.scope"))
+        self.assertEqual((recorder.commands, recorder.signals), ([], []))
+
+    def test_term_in_the_callers_own_group_is_allowed(self):
+        # From a terminal, the CLI (untouchable pid 50) and its shell share a scope
+        # with the target; that must not make the target protected.
+        self.proc.add(50, "bash", group="session-2.scope")
+        recorder = Recorder()
+        policy = ProtectionPolicy(uid=1000, untouchable=frozenset({50}))
+        Terminator(ProcFs(self.root), policy, 1000, run=recorder.run, send=recorder.send).term(Pid(20))
+        self.assertEqual(recorder.signals, [(20, signal.SIGTERM)])
+        with self.assertRaisesRegex(Refused, "protected"):
+            Terminator(ProcFs(self.root), policy, 1000, run=recorder.run, send=recorder.send).term(Pid(50))

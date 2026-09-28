@@ -45,7 +45,7 @@ omarchy plugin add https://github.com/vladimirstempel/omaprocess.git --enable --
 Optional keybinding in `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell shell toggle omaprocess '{}'")
+o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell omaprocess toggle")
 ```
 
 ## Keys

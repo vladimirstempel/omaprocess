@@ -21,6 +21,12 @@ class PidTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             Pid(0)
 
+    def test_parse_refuses_non_ascii_digits(self):
+        # "²" (superscript two) passes str.isdigit() but int() rejects it;
+        # parse must refuse it cleanly instead of raising ValueError.
+        with self.assertRaises(Refused):
+            Pid.parse("²")
+
 
 class GroupKeyTest(unittest.TestCase):
     def test_escaped_scope_is_a_unit(self):
@@ -40,6 +46,10 @@ class GroupKeyTest(unittest.TestCase):
         for text in ["", "../x.scope", "a/b.service"]:
             with self.subTest(text=text), self.assertRaises(Refused):
                 GroupKey.parse(text)
+
+    def test_trailing_newline_is_not_a_unit(self):
+        # re.match's "$" matches just before a trailing newline; fullmatch must not.
+        self.assertFalse(GroupKey("app-x.service\n").is_unit)
 
 
 class SectionTest(unittest.TestCase):

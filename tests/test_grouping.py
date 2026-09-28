@@ -47,3 +47,15 @@ class SnapshotTest(unittest.TestCase):
                                           "protected": False}]})
         self.assertEqual(data["system"][1]["unit"], "")
         self.assertTrue(data["system"][1]["procs"][0]["protected"])
+
+    def test_ordinary_process_in_a_protected_group_is_protected_too(self):
+        # "Hyprland" is not itself in the protected-comm list, but it shares
+        # its group (the shell's systemd unit) with a "quickshell" process.
+        # (pids are >1 and not otherwise untouchable, so only group membership explains it.)
+        groups = group_processes([process(10, "wayland-wm@hyprland.desktop.service", 1, "Hyprland"),
+                                  process(20, "wayland-wm@hyprland.desktop.service", 1, "quickshell")],
+                                 StubNamer(), POLICY)
+        data = snapshot(groups, POLICY)
+        rows = data["system"][0]["procs"]
+        hyprland = next(p for p in rows if p["comm"] == "Hyprland")
+        self.assertTrue(hyprland["protected"])

@@ -89,6 +89,13 @@ function markPending(pending, id, now) {
   return next
 }
 
+function unmarkPending(pending, id) {
+  if (!Object.prototype.hasOwnProperty.call(pending, id)) return pending
+  var next = Object.assign({}, pending)
+  delete next[id]
+  return next
+}
+
 function pendingState(pending, id, now) {
   if (!Object.prototype.hasOwnProperty.call(pending, id)) return ""
   return now - pending[id] >= PENDING_GRACE_MS ? "stuck" : "terminating"

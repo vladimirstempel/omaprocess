@@ -33,6 +33,8 @@ class Terminator:
 
     def _end_group(self, key: GroupKey, systemctl_args: list[str], sig: signal.Signals) -> None:
         members = [p for p in self._procfs.scan(self._uid) if p.group == key]
+        if not members:
+            return  # already gone: same as an already-gone pid, nothing to refuse
         self._policy.ensure_allowed(members)
         if key.is_unit and self._systemctl([*systemctl_args, "--", str(key)]):
             return
@@ -43,7 +45,11 @@ class Terminator:
         process = self._procfs.read(pid)
         if process is None:
             return
-        self._policy.ensure_allowed([process])
+        self._policy.ensure_allowed([process])  # best message for other-uid/PID 1/untouchable
+        # A single process can pass that check yet still belong to a protected
+        # group (e.g. Hyprland runs in the same unit as quickshell); refuse
+        # the whole group, not just the one pid, or ending it takes the shell down.
+        self._policy.ensure_group_allowed([p for p in self._procfs.scan(self._uid) if p.group == process.group])
         self._signal(pid, sig)
 
     def _systemctl(self, args: list[str]) -> bool:

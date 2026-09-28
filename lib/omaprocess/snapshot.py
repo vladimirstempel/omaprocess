@@ -21,10 +21,10 @@ def _group(group: ProcessGroup, policy: ProtectionPolicy) -> dict:
         "rss": group.rss,
         "cpu": group.cpu,
         "protected": group.protected,
-        "procs": [_process(p, policy) for p in group.processes],
+        "procs": [_process(p, group, policy) for p in group.processes],
     }
 
 
-def _process(process: Process, policy: ProtectionPolicy) -> dict:
+def _process(process: Process, group: ProcessGroup, policy: ProtectionPolicy) -> dict:
     return {"pid": process.pid.value, "comm": process.comm, "cmd": process.cmd, "rss": process.rss,
-            "cpu": process.cpu, "protected": policy.is_protected(process)}
+            "cpu": process.cpu, "protected": group.protected or policy.is_protected(process)}

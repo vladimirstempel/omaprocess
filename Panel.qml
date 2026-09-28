@@ -25,6 +25,8 @@ Panel {
   property var pending: ({})
   property real now: Date.now()
   property string errorText: ""
+  property string actionError: ""
+  property string pendingActionId: ""
   property var confirmRow: null
   property bool confirmForce: false
 
@@ -37,6 +39,7 @@ Panel {
     if (!opened) return
     search.text = ""
     root.errorText = ""
+    root.actionError = ""
     root.cursorId = ""
     helper.refresh()
   }
@@ -86,8 +89,13 @@ Panel {
     var row = root.confirmRow
     root.confirmRow = null
     if (!row) return
-    if (helper.run(Model.commandFor(row, root.confirmForce)))
+    root.actionError = ""
+    if (helper.run(Model.commandFor(row, root.confirmForce))) {
+      root.pendingActionId = row.id
       root.pending = Model.markPending(root.pending, row.id, Date.now())
+    } else {
+      root.actionError = "Another action is still running"
+    }
   }
 
   function applySnapshot(next) {
@@ -102,8 +110,19 @@ Panel {
   Helper {
     id: helper
     onSnapshotReady: function (s) { root.applySnapshot(s) }
-    onFailed: function (message) { root.errorText = message }
-    onActionFinished: refresh()
+    onFailed: function (message) {
+      root.errorText = message
+      // pendingActionId is still set here: actionFinished(ok) clears it right
+      // after this, so its presence marks this failure as the action's, not
+      // an unrelated list-refresh failure (which must not populate actionError).
+      if (root.pendingActionId !== "") root.actionError = message
+    }
+    onActionFinished: function (ok) {
+      if (!ok && root.pendingActionId !== "")
+        root.pending = Model.unmarkPending(root.pending, root.pendingActionId)
+      root.pendingActionId = ""
+      refresh()
+    }
   }
 
   Timer {
@@ -280,9 +299,9 @@ Panel {
 
           Text {
             width: parent.width
-            visible: root.errorText !== ""
+            visible: root.errorText !== "" || root.actionError !== ""
             textFormat: Text.PlainText
-            text: root.errorText
+            text: root.errorText || root.actionError
             color: Color.urgent
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.caption

@@ -23,7 +23,7 @@ class Pid:
 
     @classmethod
     def parse(cls, text: str) -> Pid:
-        if not text.isdigit() or int(text) == 0:
+        if not text.isascii() or not text.isdigit() or int(text) == 0:
             raise Refused(f"not a process id: {text!r}")
         return cls(int(text))
 
@@ -43,7 +43,7 @@ class GroupKey:
 
     @property
     def is_unit(self) -> bool:
-        return bool(_UNIT_NAME.match(self.value))
+        return bool(_UNIT_NAME.fullmatch(self.value))
 
     @classmethod
     def for_cgroup(cls, cgroup_path: str, pid: Pid) -> GroupKey:

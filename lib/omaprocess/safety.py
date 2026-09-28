@@ -14,12 +14,21 @@ class ProtectionPolicy:
         self._untouchable = untouchable
 
     def is_protected(self, process: Process) -> bool:
-        return (process.uid != self._uid or process.pid.value == 1
-                or process.pid.value in self._untouchable or process.comm in _SHELL_COMMANDS)
+        return (process.uid != self._uid or process.pid.value in self._untouchable
+                or self._takes_down_session(process))
+
+    def ensure_group_allowed(self, processes: Sequence[Process]) -> None:
+        """Refuses when the group holds the shell or PID 1. The caller's own pids do not
+        count: a terminal's scope holds the CLI and its shell, yet its other processes are fair game."""
+        for process in processes:
+            if self._takes_down_session(process):
+                raise Refused(f"{process.comm} ({process.pid}) is protected: ending it would take down the shell")
+
+    @staticmethod
+    def _takes_down_session(process: Process) -> bool:
+        return process.pid.value == 1 or process.comm in _SHELL_COMMANDS
 
     def ensure_allowed(self, processes: Sequence[Process]) -> None:
-        if not processes:
-            raise Refused("no such program or process is running")
         for process in processes:
             self._ensure_one(process)
 

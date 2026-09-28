@@ -12,7 +12,7 @@ Item {
 
   signal snapshotReady(var snapshot)
   signal failed(string message)
-  signal actionFinished()
+  signal actionFinished(bool ok)
 
   function refresh() {
     if (!listProc.running) listProc.running = true
@@ -50,7 +50,7 @@ Item {
     stderr: StdioCollector { id: actionErr; waitForEnd: true }
     onExited: function (exitCode) {
       if (exitCode !== 0) root.failed(String(actionErr.text || "").trim() || "Could not end it (" + exitCode + ")")
-      root.actionFinished()
+      root.actionFinished(exitCode === 0)
     }
   }
 }

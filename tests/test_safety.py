@@ -22,9 +22,8 @@ class ProtectionPolicyTest(unittest.TestCase):
     def test_ordinary_process_is_not_protected(self):
         self.assertFalse(self.policy.is_protected(process(42, "chromium")))
 
-    def test_ensure_allowed_refuses_empty_other_uid_and_protected(self):
+    def test_ensure_allowed_refuses_other_uid_and_protected(self):
         cases = {
-            "no such": [],
             "another user": [process(42, uid=0)],
             "protected": [process(42, "chromium"), process(43, "quickshell")],
         }

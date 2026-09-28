@@ -84,6 +84,14 @@ test("pending becomes stuck after the grace period and is pruned when gone", () 
   assert.deepEqual(Object.keys(M.prunePending(pending, SNAPSHOT)), ["g:app-c.scope"])
 })
 
+test("unmarkPending removes one id without mutating the input and leaves others", () => {
+  const pending = M.markPending(M.markPending({}, "g:a", 1000), "p:1", 1000)
+  const next = M.unmarkPending(pending, "g:a")
+  assert.deepEqual(Object.keys(next), ["p:1"])
+  assert.deepEqual(Object.keys(pending), ["g:a", "p:1"]) // input untouched
+  assert.deepEqual(M.unmarkPending(pending, "missing"), pending) // no-op, still a plain object
+})
+
 test("terminate commands, messages and protection", () => {
   const rows = M.buildRows(SNAPSHOT, view({ expanded: { "app-c.scope": true }, systemOpen: true }))
   const chromium = rows[1], renderer = rows[2], pipewire = rows[rows.length - 1]
