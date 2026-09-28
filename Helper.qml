@@ -8,7 +8,7 @@ Item {
   id: root
 
   readonly property string cli: Qt.resolvedUrl("bin/omaprocess").toString().replace(/^file:\/\//, "")
-  readonly property bool busy: listProc.running
+  readonly property bool busy: listProc.running || actionProc.running
 
   signal snapshotReady(var snapshot)
   signal failed(string message)
@@ -19,8 +19,10 @@ Item {
   }
 
   function run(args) {
+    if (actionProc.running) return false
     actionProc.command = [root.cli].concat(args)
     actionProc.running = true
+    return true
   }
 
   Process {

@@ -25,12 +25,15 @@ Panel {
   property var pending: ({})
   property real now: Date.now()
   property string errorText: ""
+  property var confirmRow: null
+  property bool confirmForce: false
 
   readonly property var rows: Model.buildRows(root.snapshot, { query: search.text, expanded: root.expanded, systemOpen: root.systemOpen })
   readonly property int cursorIndex: Model.indexOfId(root.rows, root.cursorId)
   readonly property var cursorRow: root.cursorIndex >= 0 ? root.rows[root.cursorIndex] : null
 
   onOpenedChanged: {
+    root.confirmRow = null
     if (!opened) return
     search.text = ""
     root.errorText = ""
@@ -66,8 +69,26 @@ Panel {
     }
   }
 
-  // Filled in by Task 11.
-  function askTerminate(row) {}
+  function askTerminate(row) {
+    if (!Model.canTerminate(row)) return
+    root.cursorId = row.id
+    root.confirmForce = Model.pendingState(root.pending, row.id, Date.now()) === "stuck"
+    root.confirmRow = row
+    confirm.selectedIndex = 0   // Enter defaults to Cancel
+    keyCatcher.forceActiveFocus()
+  }
+
+  function cancelTerminate() {
+    root.confirmRow = null
+  }
+
+  function confirmTerminate() {
+    var row = root.confirmRow
+    root.confirmRow = null
+    if (!row) return
+    if (helper.run(Model.commandFor(row, root.confirmForce)))
+      root.pending = Model.markPending(root.pending, row.id, Date.now())
+  }
 
   function applySnapshot(next) {
     // Rebuilding the model resets the view; put the scroll position back.
@@ -95,6 +116,16 @@ Panel {
     }
   }
 
+  // Ticks root.now on its own so a pending termination escalates to "Not
+  // responding" ~PENDING_GRACE_MS after being marked, independent of the
+  // (much slower) refresh interval above.
+  Timer {
+    interval: 250
+    repeat: true
+    running: root.opened && Object.keys(root.pending).length > 0
+    onTriggered: root.now = Date.now()
+  }
+
   BarIconButton {
     id: button
     anchors.fill: parent
@@ -112,16 +143,21 @@ Panel {
     open: root.opened
     focusTarget: search
     contentWidth: popup.fittedContentWidth(Style.space(root.setting("panelWidth", 460)))
-    contentHeight: popup.fittedContentHeight(column.implicitHeight)
+    contentHeight: popup.fittedContentHeight(Math.max(column.implicitHeight, root.confirmRow !== null ? Style.space(200) : 0))
 
     Item {
       id: keyRoot
       anchors.fill: parent
 
+      // The catcher is blocked while confirming; its unhandled keys bubble here.
+      Keys.onPressed: function (event) {
+        if (confirm.handleKey(event)) event.accepted = true
+      }
+
       PanelKeyCatcher {
         id: keyCatcher
         anchors.fill: parent
-        blocked: search.activeFocus
+        blocked: search.activeFocus || root.confirmRow !== null
         onMoveRequested: function (dx, dy) {
           if (dy !== 0) root.moveCursor(dy)
           else root.openOrClose(root.cursorRow, dx > 0)
@@ -253,6 +289,18 @@ Panel {
             wrapMode: Text.Wrap
           }
         }
+      }
+
+      ConfirmDialog {
+        id: confirm
+        anchors.fill: parent
+        z: 10
+        opened: root.confirmRow !== null
+        message: root.confirmRow ? Model.confirmMessage(root.confirmRow, root.confirmForce) : ""
+        confirmText: root.confirmForce ? "Force kill" : "Terminate"
+        fontFamily: root.bar.fontFamily
+        onCanceled: root.cancelTerminate()
+        onConfirmed: root.confirmTerminate()
       }
     }
   }
