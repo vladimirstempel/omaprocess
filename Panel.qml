@@ -47,6 +47,17 @@ Panel {
   function moveCursor(delta) {
     var index = Model.stepCursor(root.rows, root.cursorIndex, delta)
     if (index >= 0) root.cursorId = root.rows[index].id
+    root.scrollToCursor()
+  }
+
+  // Keyboard moves bring the cursor into view; refreshes and hover never scroll.
+  function scrollToCursor() {
+    Qt.callLater(function () {
+      var item = rowRepeater.itemAt(root.cursorIndex)
+      if (!item) return
+      if (item.y < list.contentY) list.contentY = item.y
+      else if (item.y + item.height > list.contentY + list.height) list.contentY = item.y + item.height - list.height
+    })
   }
 
   function setExpanded(key, open) {
@@ -69,6 +80,7 @@ Panel {
     else if (row.type === "process" && !open) {
       root.setExpanded(row.group.key, false)
       root.cursorId = "g:" + row.group.key
+      root.scrollToCursor()
     }
   }
 
@@ -99,12 +111,11 @@ Panel {
   }
 
   function applySnapshot(next) {
-    // Rebuilding the model resets the view; put the scroll position back.
-    var y = list.contentY
     root.snapshot = next
     root.pending = Model.prunePending(root.pending, next)
     root.errorText = ""
-    Qt.callLater(function () { list.contentY = Math.max(0, Math.min(y, list.contentHeight - list.height)) })
+    // Rows can vanish under the view; pull it back only if it now ends past the content.
+    Qt.callLater(function () { list.contentY = Math.max(0, Math.min(list.contentY, list.contentHeight - list.height)) })
   }
 
   Helper {
@@ -212,77 +223,90 @@ Panel {
             }
           }
 
-          ListView {
+          // Flickable + Repeater, not ListView: a new rows array reset ListView's
+          // position every refresh, and its estimated contentHeight made long lists jump.
+          Flickable {
             id: list
             width: parent.width
             height: Math.min(contentHeight, Style.space(520))
-            spacing: Style.space(4)
+            contentHeight: listColumn.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             interactive: contentHeight > height
             QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
-            model: root.rows
-            currentIndex: root.cursorIndex
-            onCurrentIndexChanged: if (currentIndex >= 0) Qt.callLater(function () { list.positionViewAtIndex(list.currentIndex, ListView.Contain) })
 
-            delegate: Item {
-              id: slot
-              required property var modelData
-              width: ListView.view.width
-              height: loader.item ? loader.item.implicitHeight : 0
+            Column {
+              id: listColumn
+              width: list.width
+              spacing: Style.space(4)
 
-              readonly property bool selected: slot.modelData.id === root.cursorId
-              readonly property string status: Model.pendingState(root.pending, slot.modelData.id, root.now)
+              Repeater {
+                id: rowRepeater
+                // A count, not the array: same-length refreshes rebind rows in place.
+                model: root.rows.length
 
-              Component {
-                id: sectionRow
-                PanelSectionHeader {
-                  text: slot.modelData.title
-                  foreground: root.bar.foreground
-                  fontFamily: root.bar.fontFamily
-                }
-              }
-              Component {
-                id: groupRow
-                GroupRow {
-                  entry: slot.modelData
-                  bar: root.bar
-                  selected: slot.selected
-                  status: slot.status
-                  onPointed: root.cursorId = slot.modelData.id
-                  onActivated: root.activate(slot.modelData)
-                  onTerminateRequested: root.askTerminate(slot.modelData)
-                }
-              }
-              Component {
-                id: processRow
-                ProcessRow {
-                  entry: slot.modelData
-                  bar: root.bar
-                  selected: slot.selected
-                  status: slot.status
-                  onPointed: root.cursorId = slot.modelData.id
-                  onTerminateRequested: root.askTerminate(slot.modelData)
-                }
-              }
-              Component {
-                id: toggleRow
-                ToggleRow {
-                  entry: slot.modelData
-                  bar: root.bar
-                  selected: slot.selected
-                  onPointed: root.cursorId = slot.modelData.id
-                  onActivated: root.activate(slot.modelData)
-                }
-              }
+                delegate: Item {
+                  id: slot
+                  required property int index
+                  // rows can shrink a moment before the count does
+                  readonly property var modelData: root.rows[slot.index] || ({ id: "", type: "section", title: "" })
+                  width: listColumn.width
+                  height: loader.item ? loader.item.implicitHeight : 0
 
-              Loader {
-                id: loader
-                width: slot.width
-                sourceComponent: slot.modelData.type === "section" ? sectionRow
-                  : slot.modelData.type === "toggle" ? toggleRow
-                  : slot.modelData.type === "group" ? groupRow
-                  : processRow
+                  readonly property bool selected: slot.modelData.id === root.cursorId
+                  readonly property string status: Model.pendingState(root.pending, slot.modelData.id, root.now)
+
+                  Component {
+                    id: sectionRow
+                    PanelSectionHeader {
+                      text: slot.modelData.title
+                      foreground: root.bar.foreground
+                      fontFamily: root.bar.fontFamily
+                    }
+                  }
+                  Component {
+                    id: groupRow
+                    GroupRow {
+                      entry: slot.modelData
+                      bar: root.bar
+                      selected: slot.selected
+                      status: slot.status
+                      onPointed: root.cursorId = slot.modelData.id
+                      onActivated: root.activate(slot.modelData)
+                      onTerminateRequested: root.askTerminate(slot.modelData)
+                    }
+                  }
+                  Component {
+                    id: processRow
+                    ProcessRow {
+                      entry: slot.modelData
+                      bar: root.bar
+                      selected: slot.selected
+                      status: slot.status
+                      onPointed: root.cursorId = slot.modelData.id
+                      onTerminateRequested: root.askTerminate(slot.modelData)
+                    }
+                  }
+                  Component {
+                    id: toggleRow
+                    ToggleRow {
+                      entry: slot.modelData
+                      bar: root.bar
+                      selected: slot.selected
+                      onPointed: root.cursorId = slot.modelData.id
+                      onActivated: root.activate(slot.modelData)
+                    }
+                  }
+
+                  Loader {
+                    id: loader
+                    width: slot.width
+                    sourceComponent: slot.modelData.type === "section" ? sectionRow
+                      : slot.modelData.type === "toggle" ? toggleRow
+                      : slot.modelData.type === "group" ? groupRow
+                      : processRow
+                  }
+                }
               }
             }
           }
