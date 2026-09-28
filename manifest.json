@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "omaprocess",
+  "name": "OmaProcess",
+  "version": "0.1.0",
+  "author": "stempelv",
+  "description": "See running programs by name and end the one that misbehaves",
+  "license": "MIT",
+  "homepage": "https://github.com/vladimirstempel/omaprocess",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Processes",
+    "description": "Running programs with human names, and a way to end them",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "panelWidth": 460,
+      "refreshSeconds": 2
+    },
+    "schema": [
+      {
+        "key": "panelWidth",
+        "type": "integer",
+        "label": "Panel width",
+        "min": 360,
+        "max": 900,
+        "step": 20,
+        "defaultValue": 460,
+        "description": "In the shell's spacing units. Anything wider than the screen is trimmed to fit."
+      },
+      {
+        "key": "refreshSeconds",
+        "type": "integer",
+        "label": "Refresh interval",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "defaultValue": 2,
+        "description": "Seconds between updates while the panel is open. Nothing is polled while it is closed."
+      }
+    ]
+  }
+}

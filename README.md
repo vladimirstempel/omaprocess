@@ -6,8 +6,6 @@ their real names and icons, "Chromium", "Zed", "Steam", instead of `chromium`
 times forty-seven. Expand a program to see its processes, and terminate either
 the whole program or a single process, always after a confirmation.
 
-> Status: in development.
-
 ## What it shows
 
 - **Applications**: everything you launched, grouped by the systemd scope
@@ -47,7 +45,7 @@ omarchy plugin add https://github.com/vladimirstempel/omaprocess.git --enable --
 Optional keybinding in `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell shell toggle omaprocess '{}'")
+o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell omaprocess toggle")
 ```
 
 ## Keys
