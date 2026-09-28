@@ -9,10 +9,11 @@ import tempfile
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from .actions import Terminator
 from .cpu import CpuSampler
 from .desktop import DesktopCatalog
 from .grouping import group_processes
-from .model import Refused
+from .model import GroupKey, Pid, Refused
 from .naming import default_namer
 from .procfs import ProcFs
 from .safety import ProtectionPolicy
@@ -37,6 +38,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--uid", type=int, default=os.getuid(), help=argparse.SUPPRESS)
     commands = parser.add_subparsers(required=True, metavar="{list,stop,kill-unit,term,kill}")
     commands.add_parser("list", help="print running programs as JSON").set_defaults(handler=_list)
+    for name, handler, target in [("stop", _stop, "key"), ("kill-unit", _kill_unit, "key"),
+                                  ("term", _term, "pid"), ("kill", _kill, "pid")]:
+        command = commands.add_parser(name, help=f"end a {'program' if target == 'key' else 'process'}")
+        command.add_argument("target", metavar=target.upper())
+        command.set_defaults(handler=handler)
     return parser
 
 
@@ -62,3 +68,27 @@ def _application_dirs(env: Mapping[str, str]) -> list[Path]:
 
 def _state_file(env: Mapping[str, str]) -> Path:
     return Path(env.get("XDG_RUNTIME_DIR") or tempfile.gettempdir()) / "omaprocess" / "cpu.json"
+
+
+def _terminator(args: argparse.Namespace) -> Terminator:
+    return Terminator(ProcFs(Path(args.proc)), _policy(args), args.uid)
+
+
+def _stop(args: argparse.Namespace, env: Mapping[str, str]) -> int:
+    _terminator(args).stop_group(GroupKey.parse(args.target))
+    return 0
+
+
+def _kill_unit(args: argparse.Namespace, env: Mapping[str, str]) -> int:
+    _terminator(args).kill_group(GroupKey.parse(args.target))
+    return 0
+
+
+def _term(args: argparse.Namespace, env: Mapping[str, str]) -> int:
+    _terminator(args).term(Pid.parse(args.target))
+    return 0
+
+
+def _kill(args: argparse.Namespace, env: Mapping[str, str]) -> int:
+    _terminator(args).kill(Pid.parse(args.target))
+    return 0

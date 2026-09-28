@@ -50,3 +50,19 @@ class CliTest(unittest.TestCase):
         result = subprocess.run([str(ROOT / "bin" / "omaprocess"), "--help"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
         self.assertIn("list", result.stdout)
+
+    def test_term_refuses_another_users_process(self):
+        self.proc.add(13, "sshd", uid=0, group="sshd.service")
+        code, out, err = self.run_cli("term", "13")
+        self.assertEqual(code, 1)
+        self.assertIn("omaprocess: sshd (13) belongs to another user", err)
+
+    def test_term_refuses_garbage_pid(self):
+        code, _, err = self.run_cli("term", "12abc")
+        self.assertEqual(code, 1)
+        self.assertIn("not a process id", err)
+
+    def test_stop_refuses_path_like_key(self):
+        code, _, err = self.run_cli("stop", "../evil.service")
+        self.assertEqual(code, 1)
+        self.assertIn("invalid group key", err)
