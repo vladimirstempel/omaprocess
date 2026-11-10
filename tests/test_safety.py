@@ -4,9 +4,9 @@ from omaprocess.model import GroupKey, Pid, Process, Refused
 from omaprocess.safety import ProtectionPolicy
 
 
-def process(pid, comm="x", uid=1000):
+def process(pid, comm="x", uid=1000, group="app-x.scope"):
     return Process(pid=Pid(pid), ppid=1, uid=uid, comm=comm, exe="", cmd=comm, rss=1,
-                   cpu_ticks=0, start_ticks=0, group=GroupKey("app-x.scope"))
+                   cpu_ticks=0, start_ticks=0, group=GroupKey(group))
 
 
 class ProtectionPolicyTest(unittest.TestCase):
@@ -15,12 +15,14 @@ class ProtectionPolicyTest(unittest.TestCase):
 
     def test_protected_processes(self):
         for p in [process(1), process(500), process(9, "quickshell"), process(9, "qs"),
-                  process(9, "omarchy-shell"), process(9, uid=0)]:
+                  process(9, "omarchy-shell"), process(9, uid=0),
+                  process(9, "systemd", group="init.scope"), process(9, "uwsm", group="session-2.scope")]:
             with self.subTest(pid=p.pid, comm=p.comm, uid=p.uid):
                 self.assertTrue(self.policy.is_protected(p))
 
     def test_ordinary_process_is_not_protected(self):
         self.assertFalse(self.policy.is_protected(process(42, "chromium")))
+        self.assertFalse(self.policy.is_protected(process(42, "bash", group="kitty-session-2.scope")))
 
     def test_ensure_allowed_refuses_other_uid_and_protected(self):
         cases = {

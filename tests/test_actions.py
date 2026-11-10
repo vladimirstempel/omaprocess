@@ -36,7 +36,7 @@ class TerminatorTest(unittest.TestCase):
         self.proc = FakeProc(self.root)
         self.proc.add(10, "chromium", group=UNIT)
         self.proc.add(11, "chromium", group=UNIT)
-        self.proc.add(20, "sleep", group="session-2.scope")
+        self.proc.add(20, "sleep", group="tmux-spawn-1.scope")
         self.proc.add(30, "sshd", uid=0, group="sshd.service")
         self.proc.add(40, "quickshell", group="wayland-wm@hyprland.desktop.service")
         self.proc.add(41, "Hyprland", group="wayland-wm@hyprland.desktop.service")
@@ -51,6 +51,20 @@ class TerminatorTest(unittest.TestCase):
         self.assertEqual(recorder.commands, [["systemctl", "--user", "stop", "--no-block", "--", UNIT]])
         self.assertEqual(recorder.signals, [])
 
+    def test_program_of_several_units_is_stopped_unit_by_unit(self):
+        self.proc.add(12, "chromium", group="app-org.chromium.Chromium-12.scope")
+        recorder = Recorder()
+        self.terminator(recorder).stop_group(GroupKey(UNIT), GroupKey("app-org.chromium.Chromium-12.scope"),
+                                             GroupKey("app-gone.scope"))
+        self.assertEqual([command[-1] for command in recorder.commands],
+                         [UNIT, "app-org.chromium.Chromium-12.scope"])
+
+    def test_one_protected_unit_stops_none_of_the_program(self):
+        recorder = Recorder()
+        with self.assertRaisesRegex(Refused, "protected"):
+            self.terminator(recorder).stop_group(GroupKey(UNIT), GroupKey("wayland-wm@hyprland.desktop.service"))
+        self.assertEqual((recorder.commands, recorder.signals), ([], []))
+
     def test_kill_group_uses_systemctl_kill(self):
         recorder = Recorder()
         self.terminator(recorder).kill_group(GroupKey(UNIT))
@@ -58,8 +72,20 @@ class TerminatorTest(unittest.TestCase):
 
     def test_group_outside_user_manager_falls_back_to_signals(self):
         recorder = Recorder(returncode=5)
-        self.terminator(recorder).stop_group(GroupKey("session-2.scope"))
+        self.terminator(recorder).stop_group(GroupKey("tmux-spawn-1.scope"))
         self.assertEqual(recorder.signals, [(20, signal.SIGTERM)])
+
+    def test_user_manager_and_login_session_are_refused(self):
+        self.proc.add(60, "systemd", group="init.scope")
+        self.proc.add(61, "uwsm", group="session-2.scope")
+        for unit, pid in [("init.scope", 60), ("session-2.scope", 61)]:
+            with self.subTest(unit=unit):
+                recorder = Recorder(returncode=5)
+                with self.assertRaisesRegex(Refused, "protected"):
+                    self.terminator(recorder).stop_group(GroupKey(unit))
+                with self.assertRaisesRegex(Refused, "protected"):
+                    self.terminator(recorder).kill(Pid(pid))
+                self.assertEqual((recorder.commands, recorder.signals), ([], []))
 
     def test_group_with_the_shell_is_refused(self):
         with self.assertRaisesRegex(Refused, "protected"):
@@ -96,7 +122,7 @@ class TerminatorTest(unittest.TestCase):
     def test_term_in_the_callers_own_group_is_allowed(self):
         # From a terminal, the CLI (untouchable pid 50) and its shell share a scope
         # with the target; that must not make the target protected.
-        self.proc.add(50, "bash", group="session-2.scope")
+        self.proc.add(50, "bash", group="tmux-spawn-1.scope")
         recorder = Recorder()
         policy = ProtectionPolicy(uid=1000, untouchable=frozenset({50}))
         Terminator(ProcFs(self.root), policy, 1000, run=recorder.run, send=recorder.send).term(Pid(20))

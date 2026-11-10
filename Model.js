@@ -4,28 +4,49 @@
 
 var PENDING_GRACE_MS = 3000
 
-function formatBytes(bytes) {
+// Every function that writes text takes l10n, the panel's language:
+//   t(key)            a string of the catalog in i18n/
+//   tn(key, count)    its plural form for count
+//   number(value, n)  value with n decimals, in the language's digits and separator
+
+// Puts args into a string's %1, %2... placeholders.
+function fill(template, args) {
+  return String(template).replace(/%(\d)/g, function (whole, n) {
+    var value = args[Number(n) - 1]
+    return value === undefined ? whole : String(value)
+  })
+}
+
+function formatBytes(bytes, l10n) {
   var units = ["B", "KB", "MB", "GB", "TB"]
   var value = Number(bytes) || 0
   var unit = 0
   while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++ }
-  var digits = unit >= 3 ? 1 : 0
-  return value.toFixed(digits) + " " + units[unit]
+  return l10n.number(value, unit >= 3 ? 1 : 0) + " " + units[unit]
 }
 
-function formatCpu(cpu) {
+function formatCpu(cpu, l10n) {
   var value = Number(cpu) || 0
-  var shown = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10
-  return shown + "% CPU"
+  var whole = value >= 10 || Math.round(value * 10) % 10 === 0
+  return l10n.number(value, whole ? 0 : 1) + "% CPU"
 }
 
-function groupCaption(group) {
-  var noun = group.count === 1 ? " process" : " processes"
-  return group.count + noun + " · " + formatBytes(group.rss) + " · " + formatCpu(group.cpu)
+function _countedProcesses(count, l10n) {
+  return fill(l10n.tn("processes", count), [l10n.number(count, 0)])
 }
 
-function processCaption(proc) {
-  return "PID " + proc.pid + " · " + formatBytes(proc.rss) + " · " + formatCpu(proc.cpu) + " · " + proc.cmd
+function groupCaption(group, l10n) {
+  return _countedProcesses(group.count, l10n) + " · " + formatBytes(group.rss, l10n) + " · " + formatCpu(group.cpu, l10n)
+}
+
+function processCaption(proc, l10n) {
+  return "PID " + proc.pid + " · " + formatBytes(proc.rss, l10n) + " · " + formatCpu(proc.cpu, l10n) + " · " + proc.cmd
+}
+
+// The heaviest first, by memory or by CPU. Memory settles a tie, so idle rows keep their place.
+function _sorted(items, sort) {
+  var field = sort === "cpu" ? "cpu" : "rss"
+  return items.slice().sort(function (a, b) { return (b[field] - a[field]) || (b.rss - a.rss) })
 }
 
 function _contains(text, query) {
@@ -40,15 +61,15 @@ function _visible(group, query) {
   return procs.length > 0 ? { procs: procs, forced: true } : null
 }
 
-function _groupRows(groups, query, expanded, system) {
+function _groupRows(groups, query, expanded, system, sort) {
   var rows = []
-  groups.forEach(function (group) {
+  _sorted(groups, sort).forEach(function (group) {
     var visible = _visible(group, query)
     if (!visible) return
     var open = visible.forced || expanded[group.key] === true
     rows.push({ type: "group", id: "g:" + group.key, group: group, expanded: open, system: system })
     if (!open) return
-    visible.procs.forEach(function (proc) { rows.push({ type: "process", id: "p:" + proc.pid, proc: proc, group: group }) })
+    _sorted(visible.procs, sort).forEach(function (proc) { rows.push({ type: "process", id: "p:" + proc.pid, proc: proc, group: group }) })
   })
   return rows
 }
@@ -56,14 +77,14 @@ function _groupRows(groups, query, expanded, system) {
 function buildRows(snapshot, view) {
   var query = String(view.query || "").trim().toLowerCase()
   var expanded = view.expanded || {}
-  var apps = _groupRows(snapshot.apps || [], query, expanded, false)
-  var system = _groupRows(snapshot.system || [], query, expanded, true)
+  var apps = _groupRows(snapshot.apps || [], query, expanded, false, view.sort)
+  var system = _groupRows(snapshot.system || [], query, expanded, true, view.sort)
   var rows = []
-  if (apps.length > 0) rows = rows.concat([{ type: "section", id: "section:apps", title: "APPLICATIONS" }], apps)
+  if (apps.length > 0) rows = rows.concat([{ type: "section", id: "section:apps" }], apps)
   if (system.length === 0) return rows
   var open = view.systemOpen === true || query !== ""
   var count = system.filter(function (r) { return r.type === "group" }).length
-  rows.push({ type: "toggle", id: "system", title: "SYSTEM", count: count, open: open })
+  rows.push({ type: "toggle", id: "system", count: count, open: open })
   return open ? rows.concat(system) : rows
 }
 
@@ -119,17 +140,15 @@ function canTerminate(row) {
   return false
 }
 
-function confirmMessage(row, force) {
-  var verb = force ? "Force kill " : "Terminate "
-  var tail = force ? " It will not get a chance to save." : ""
-  if (row.type === "process") return verb + row.proc.comm + " (PID " + row.proc.pid + ")?" + tail
-  var noun = row.group.count === 1 ? " process" : " processes"
-  var text = verb + row.group.name + "? (" + row.group.count + noun + ")" + tail
-  if (row.system === true) text += " This is a session service; the desktop may stop working."
-  return text
+function confirmMessage(row, force, l10n) {
+  var action = force ? "confirm.kill" : "confirm.terminate"
+  if (row.type === "process") return fill(l10n.t(action + ".process"), [row.proc.comm, row.proc.pid])
+  var text = fill(l10n.t(action + ".program"), [row.group.name, _countedProcesses(row.group.count, l10n)])
+  return row.system === true ? text + " " + l10n.t("confirm.service") : text
 }
 
+// A program can span several units; the helper ends them all, or none.
 function commandFor(row, force) {
   if (row.type === "process") return [force ? "kill" : "term", String(row.proc.pid)]
-  return [force ? "kill-unit" : "stop", row.group.key]
+  return [force ? "kill-unit" : "stop"].concat(row.group.keys || [row.group.key])
 }

@@ -22,7 +22,7 @@ class FakeProc:
         os.symlink(exe or f"/usr/bin/{comm}", directory / "exe")
 
 
-def write_desktop(directory, desktop_id, *, name, exec_line, icon="", wm_class="", hidden=False):
+def write_desktop(directory, desktop_id, *, name, exec_line, icon="", wm_class="", hidden=False, no_display=False):
     directory.mkdir(parents=True, exist_ok=True)
     lines = ["[Desktop Entry]", "Type=Application", f"Name={name}", f"Exec={exec_line}"]
     if icon:
@@ -31,6 +31,8 @@ def write_desktop(directory, desktop_id, *, name, exec_line, icon="", wm_class="
         lines.append(f"StartupWMClass={wm_class}")
     if hidden:
         lines.append("Hidden=true")
+    if no_display:
+        lines.append("NoDisplay=true")
     lines += ["", "[Desktop Action new]", "Name=Should Not Win", "Exec=other"]
     path = directory / f"{desktop_id}.desktop"
     path.write_text("\n".join(lines) + "\n")

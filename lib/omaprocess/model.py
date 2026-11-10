@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 _UNIT_NAME = re.compile(r"^[A-Za-z0-9:_.@\\-]+\.(scope|service)$")
@@ -103,18 +103,28 @@ class Process:
 class Identity:
     name: str
     icon: str = ""
+    # True when a window or a desktop entry named it, not merely a unit or a process name.
+    recognised: bool = field(default=False, compare=False)
 
 
 @dataclass(frozen=True)
 class ProcessGroup:
+    """One program. It can span several units: key is the one it is known by, keys is all of them."""
+
     key: GroupKey
     identity: Identity
     processes: tuple[Process, ...]
     protected: bool
+    keys: tuple[GroupKey, ...] = ()
+    placed: Section | None = None
+
+    def __post_init__(self) -> None:
+        if not self.keys:
+            object.__setattr__(self, "keys", (self.key,))
 
     @property
     def section(self) -> Section:
-        return Section.of(self.key)
+        return self.placed or Section.of(self.key)
 
     @property
     def count(self) -> int:

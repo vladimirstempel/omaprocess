@@ -1,0 +1,24 @@
+{
+  "tooltip": "Processes",
+  "search.placeholder": "Search programs, processes or PIDs",
+  "section.apps": "APPLICATIONS",
+  "section.system": "SYSTEM (%1)",
+  "sort.memory": "Memory",
+  "sort.cpu": "CPU",
+  "processes": {
+    "one": "%1 process",
+    "other": "%1 processes"
+  },
+  "status.terminating": "Terminating…",
+  "status.stuck": "Not responding",
+  "action.terminate": "Terminate",
+  "action.kill": "Force kill",
+  "empty.loading": "Loading…",
+  "empty.nothing": "Nothing matches “%1”",
+  "error.busy": "Another action is still running",
+  "confirm.terminate.process": "Terminate %1 (PID %2)?",
+  "confirm.kill.process": "Force kill %1 (PID %2)? It will not get a chance to save.",
+  "confirm.terminate.program": "Terminate %1? (%2)",
+  "confirm.kill.program": "Force kill %1? (%2) It will not get a chance to save.",
+  "confirm.service": "This is a session service; the desktop may stop working."
+}

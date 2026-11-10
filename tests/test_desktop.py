@@ -59,6 +59,13 @@ class CatalogTest(unittest.TestCase):
         self.assertEqual(catalog.find_by_executable("chromium").name, "Chromium")
         self.assertIsNone(catalog.find_by_executable(""))
 
+    def test_no_display_entry_never_names_a_program_by_its_executable(self):
+        write_desktop(self.system, "claude-url-handler", name="URL Handler", exec_line="claude %u", no_display=True)
+        catalog = DesktopCatalog.load([self.system])
+        self.assertIsNone(catalog.find_by_executable("claude"))
+        self.assertEqual(catalog.find_by_id("claude-url-handler").name, "URL Handler")
+        self.assertIsNone(catalog.find_by_id(""))
+
     def test_earlier_dir_wins_and_hidden_user_entry_hides_system_one(self):
         write_desktop(self.user, "zed", name="My Zed", exec_line="zed")
         write_desktop(self.system, "zed", name="Zed", exec_line="zed")

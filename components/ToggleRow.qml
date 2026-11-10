@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../Model.js" as Model
 
 // "SYSTEM (12)" header that opens and closes the session-services section.
 CursorSurface {
@@ -8,6 +9,7 @@ CursorSurface {
 
   required property var entry
   required property QtObject bar
+  required property var l10n
   property bool selected: false
   property string status: ""
 
@@ -32,7 +34,7 @@ CursorSurface {
     anchors.left: parent.left
     anchors.leftMargin: Style.space(10)
     anchors.verticalCenter: parent.verticalCenter
-    text: (row.entry.open ? "󰅀 " : "󰅂 ") + row.entry.title + " (" + row.entry.count + ")"
+    text: (row.entry.open ? "󰅀 " : "󰅂 ") + Model.fill(row.l10n.t("section.system"), [row.l10n.number(row.entry.count, 0)])
     foreground: row.bar.foreground
     fontFamily: row.bar.fontFamily
   }
