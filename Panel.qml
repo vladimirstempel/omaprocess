@@ -13,7 +13,9 @@ import "components"
 Panel {
   id: root
   moduleName: "omaprocess"
-  ipcTarget: "omaprocess"
+  // No ipcTarget: the bar builds one widget per monitor and only the first
+  // could own the target, so the panel opened on the wrong screen. The shell
+  // reaches the widget on the focused monitor: omarchy-shell shell toggle omaprocess
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -313,7 +315,7 @@ Panel {
 
           Text {
             width: parent.width
-            visible: root.rows.length === 0
+            visible: root.rows.length === 0 && root.errorText === ""
             textFormat: Text.PlainText
             text: search.text !== "" ? "Nothing matches “" + search.text + "”" : "Loading…"
             color: Qt.darker(root.bar.foreground, 1.5)

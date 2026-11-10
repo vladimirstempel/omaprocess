@@ -4,13 +4,16 @@ import unittest
 
 from omaprocess.desktop import DesktopCatalog, DesktopEntry
 from omaprocess.model import GroupKey, Identity, Pid, Process
-from omaprocess.naming import default_namer
+from omaprocess.naming import default_namer, unit_hint
 from omaprocess.windows import HyprlandWindows, NoWindows
 
 
-def process(pid, comm, exe=None, start=100):
+LAUNCHED = r"app-Hyprland-gtk\x2dlaunch-b4ca519e.scope"  # named after the launcher: says nothing
+
+
+def process(pid, comm, exe=None, start=100, group=LAUNCHED):
     return Process(pid=Pid(pid), ppid=1, uid=1000, comm=comm, exe=exe or f"/usr/bin/{comm}", cmd=comm,
-                   rss=1, cpu_ticks=0, start_ticks=start, group=GroupKey("app-x.scope"))
+                   rss=1, cpu_ticks=0, start_ticks=start, group=GroupKey(group))
 
 
 def entry(desktop_id, name, executable, icon="", wm_class=""):
@@ -21,6 +24,7 @@ CATALOG = DesktopCatalog([
     entry("chromium", "Chromium", "chromium", icon="chromium", wm_class="chromium"),
     entry("whatsapp", "WhatsApp", "omarchy-launch-webapp", wm_class="chrome-web.whatsapp.com__-Default"),
     entry("steam", "Steam", "steam", icon="steam"),
+    entry("com.t3tools.T3Code", "T3 Code", "t3code", icon="t3"),
 ])
 
 
@@ -47,6 +51,41 @@ class NamerTest(unittest.TestCase):
         namer = default_namer(CATALOG, NoWindows())
         group = [process(2, "helper", start=200), process(1, "sh", start=100), process(3, "mytool", start=150)]
         self.assertEqual(namer.identify(group), Identity("Mytool"))
+
+    def test_unit_named_after_a_desktop_entry_or_its_command_takes_that_entry(self):
+        namer = default_namer(CATALOG, NoWindows())
+        for unit in ["app-com.t3tools.T3Code-305141.scope", "app-com.t3tools.T3Code@autostart.service",
+                     "app-Hyprland-t3code-55b5ccf5.scope"]:
+            with self.subTest(unit=unit):
+                self.assertEqual(namer.identify([process(1, "helper", group=unit)]), Identity("T3 Code", "t3"))
+
+    def test_unit_name_beats_the_programs_running_inside_it(self):
+        # A session of a terminal multiplexer holds many programs; none of them names it.
+        namer = default_namer(CATALOG, NoWindows())
+        group = [process(1, "herdr", group="app-Hyprland-herdr-55b5ccf5.scope"),
+                 process(2, "steam", group="app-Hyprland-herdr-55b5ccf5.scope")]
+        self.assertEqual(namer.identify(group), Identity("Herdr"))
+
+    def test_service_is_named_in_full_after_its_unit(self):
+        namer = default_namer(CATALOG, NoWindows())
+        named = {unit: namer.identify([process(1, "xdg-desktop-por", group=unit)]).name for unit in [
+            "xdg-desktop-portal-hyprland.service", "wayland-session-bindpid@1329.service",
+            "wayland-wm@hyprland.desktop.service", r"app-Hyprland-omarchy\x2dmonitor\x2dwatch-9a100c1b.scope"]}
+        self.assertEqual(list(named.values()), ["Xdg-desktop-portal-hyprland", "Wayland-session-bindpid",
+                                                "Hyprland", "Omarchy-monitor-watch"])
+
+    def test_unit_hint(self):
+        hints = {
+            r"app-Hyprland-gtk\x2dlaunch-51848070.scope": "gtk-launch",
+            "app-org.chromium.Chromium-1324334.scope": "org.chromium.Chromium",
+            "app-org.kde.kdeconnect.daemon@autostart.service": "org.kde.kdeconnect.daemon",
+            "dbus-:1.1-org.telegram.desktop@0.service": "org.telegram.desktop",
+            "pipewire.service": "pipewire",
+            "kitty-508934-0.scope": "", "session-2.scope": "", "init.scope": "", "pid-42": "",
+        }
+        for unit, hint in hints.items():
+            with self.subTest(unit=unit):
+                self.assertEqual(unit_hint(unit), hint)
 
     def test_only_wrappers_falls_back_to_oldest(self):
         namer = default_namer(CATALOG, NoWindows())

@@ -2,6 +2,7 @@ import io
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -47,7 +48,9 @@ class CliTest(unittest.TestCase):
         self.assertTrue((self.dir / "run" / "omaprocess" / "cpu.json").exists())
 
     def test_launcher_runs(self):
-        result = subprocess.run([str(ROOT / "bin" / "omaprocess"), "--help"], capture_output=True, text=True)
+        # Through the interpreter, as the panel runs it: the file may sit where it cannot be executed.
+        result = subprocess.run([sys.executable, str(ROOT / "bin" / "omaprocess"), "--help"],
+                                capture_output=True, text=True)
         self.assertEqual(result.returncode, 0)
         self.assertIn("list", result.stdout)
 

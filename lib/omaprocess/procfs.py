@@ -8,6 +8,7 @@ from pathlib import Path
 from .model import GroupKey, Pid, Process
 
 _CMD_LIMIT = 200
+_COMM_LIMIT = 15  # TASK_COMM_LEN - 1
 
 
 @dataclass(frozen=True)
@@ -51,8 +52,9 @@ class ProcFs:
             return None
         if stat is None or not argv:
             return None
-        return Process(pid=pid, ppid=stat.ppid, uid=_status_int(status, "Uid:"), comm=stat.comm,
-                       exe=_readlink(base / "exe"), cmd=_command_line(argv),
+        exe = _readlink(base / "exe")
+        return Process(pid=pid, ppid=stat.ppid, uid=_status_int(status, "Uid:"),
+                       comm=_full_name(stat.comm, exe, argv), exe=exe, cmd=_command_line(argv),
                        rss=_status_int(status, "VmRSS:") * 1024, cpu_ticks=stat.cpu_ticks,
                        start_ticks=stat.start_ticks, group=GroupKey.for_cgroup(_unified(cgroup), pid))
 
@@ -80,6 +82,19 @@ def _unified(cgroup: str) -> str:
         if line.startswith("0::"):
             return line[3:]
     return ""
+
+
+def _full_name(comm: str, exe: str, argv: bytes) -> str:
+    """The kernel cuts comm at 15 characters. The executable or the script it runs
+    usually carries the whole name; take it only when it starts with what comm shows."""
+    if len(comm) < _COMM_LIMIT:
+        return comm
+    arguments = [a.decode(errors="replace") for a in argv.split(b"\0")[:2]]
+    for candidate in [exe, *arguments]:
+        name = candidate.rsplit("/", 1)[-1]
+        if name.startswith(comm):
+            return name
+    return comm
 
 
 def _command_line(argv: bytes) -> str:

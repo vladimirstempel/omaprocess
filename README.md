@@ -16,8 +16,8 @@ the whole program or a single process, always after a confirmation.
 - Only your own processes. Nothing owned by root or other users is listed or
   touched.
 
-Names and icons come from the program's window (Hyprland) and its `.desktop`
-entry, falling back to the process name.
+Names and icons come from the program's window (Hyprland), then its `.desktop`
+entry, then the name of its systemd unit, falling back to the process name.
 
 ## Terminating
 
@@ -28,12 +28,13 @@ entry, falling back to the process name.
 3. If it is still there after a few seconds, the row says "Not responding"
    and offers **Force kill** (`SIGKILL`), behind another confirmation.
 
-The shell itself (`omarchy-shell` / Quickshell) is never offered for
-termination: ending it would take the panel and the bar with it.
+The shell itself (`omarchy-shell` / Quickshell), your systemd user manager
+and your login session are never offered for termination: ending one would
+take the panel, the bar or the whole session with it.
 
 ## Requirements
 
-- Omarchy 4 (the Quickshell `omarchy-shell`, plugin schema 1)
+- Omarchy 4, tested on 4.5 (the Quickshell `omarchy-shell`, plugin schema 1)
 - Python 3, which Omarchy already installs
 
 ## Install
@@ -45,7 +46,7 @@ omarchy plugin add https://github.com/vladimirstempel/omaprocess.git --enable --
 Optional keybinding in `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell omaprocess toggle")
+o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell shell toggle omaprocess")
 ```
 
 ## Keys

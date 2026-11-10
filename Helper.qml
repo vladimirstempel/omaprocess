@@ -8,6 +8,9 @@ Item {
   id: root
 
   readonly property string cli: Qt.resolvedUrl("bin/omaprocess").toString().replace(/^file:\/\//, "")
+  // Through the interpreter, not the file itself: a checkout without the
+  // executable bit, or one on a noexec mount, must still work.
+  readonly property var launcher: ["python3", root.cli]
   readonly property bool busy: listProc.running || actionProc.running
 
   signal snapshotReady(var snapshot)
@@ -15,19 +18,26 @@ Item {
   signal actionFinished(bool ok)
 
   function refresh() {
-    if (!listProc.running) listProc.running = true
+    if (listProc.running) return
+    listProc.launched = false
+    listProc.running = true
   }
 
   function run(args) {
     if (actionProc.running) return false
-    actionProc.command = [root.cli].concat(args)
+    actionProc.command = root.launcher.concat(args)
+    actionProc.launched = false
     actionProc.running = true
     return true
   }
 
   Process {
     id: listProc
-    command: [root.cli, "list"]
+    // A process that never started exits with no code: say so, or the panel waits forever.
+    property bool launched: false
+    command: root.launcher.concat(["list"])
+    onStarted: launched = true
+    onRunningChanged: if (!running && !launched) root.failed("Could not run python3")
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -47,6 +57,13 @@ Item {
 
   Process {
     id: actionProc
+    property bool launched: false
+    onStarted: launched = true
+    onRunningChanged: {
+      if (running || launched) return
+      root.failed("Could not run python3")
+      root.actionFinished(false)
+    }
     stderr: StdioCollector { id: actionErr; waitForEnd: true }
     onExited: function (exitCode) {
       if (exitCode !== 0) root.failed(String(actionErr.text || "").trim() || "Could not end it (" + exitCode + ")")

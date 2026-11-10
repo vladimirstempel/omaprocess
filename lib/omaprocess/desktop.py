@@ -16,6 +16,7 @@ class DesktopEntry:
     icon: str
     executable: str
     wm_class: str
+    hidden: bool = False
 
     def identity(self) -> Identity:
         return Identity(self.name, self.icon)
@@ -27,7 +28,8 @@ def parse_desktop_file(path: Path) -> DesktopEntry | None:
         return None
     return DesktopEntry(id=path.stem, name=fields["Name"], icon=fields.get("Icon", ""),
                         executable=_executable(fields.get("Exec", "")),
-                        wm_class=fields.get("StartupWMClass", ""))
+                        wm_class=fields.get("StartupWMClass", ""),
+                        hidden=fields.get("NoDisplay", "").lower() == "true")
 
 
 def _main_section(text: str) -> dict[str, str]:
@@ -80,6 +82,9 @@ class DesktopCatalog:
         key = window_class.lower()
         return self._by_wm_class.get(key) or self._by_id.get(key) or self._by_id_tail.get(key)
 
+    def find_by_id(self, desktop_id: str) -> DesktopEntry | None:
+        return self._by_id.get(desktop_id.lower()) if desktop_id else None
+
     def find_by_executable(self, name: str) -> DesktopEntry | None:
         return self._by_executable.get(name.lower()) if name else None
 
@@ -88,7 +93,8 @@ class DesktopCatalog:
             self._by_wm_class.setdefault(entry.wm_class.lower(), entry)
         self._by_id.setdefault(entry.id.lower(), entry)
         self._by_id_tail.setdefault(entry.id.rsplit(".", 1)[-1].lower(), entry)
-        executable = entry.executable.lower()
+        # A NoDisplay entry is a URL or MIME handler, not the program a user would recognise.
+        executable = "" if entry.hidden else entry.executable.lower()
         if executable and (executable not in self._by_executable or entry.id.lower() == executable):
             self._by_executable[executable] = entry
 

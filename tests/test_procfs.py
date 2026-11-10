@@ -9,6 +9,14 @@ from omaprocess.procfs import ProcFs
 
 
 class ProcFsTest(unittest.TestCase):
+    def test_name_cut_by_the_kernel_is_completed_from_the_executable_or_script(self):
+        self.proc.add(20, "chrome_crashpad", exe="/usr/lib/chromium/chrome_crashpad_handler")
+        self.proc.add(21, "omarchy-hyprlan", exe="/usr/bin/bash",
+                      cmd=["bash", "/usr/share/omarchy/bin/omarchy-hyprland-monitor-watch"])
+        self.proc.add(22, "node-MainThread", exe="/usr/bin/node", cmd=["node", "server.js"])
+        names = [self.procfs.read(Pid(pid)).comm for pid in (20, 21, 22)]
+        self.assertEqual(names, ["chrome_crashpad_handler", "omarchy-hyprland-monitor-watch", "node-MainThread"])
+
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root)
