@@ -37,6 +37,10 @@ class NamerTest(unittest.TestCase):
         namer = default_namer(CATALOG, windows((10, "chrome-web.whatsapp.com__-Default"), (10, "chromium")))
         self.assertEqual(namer.identify([process(10, "chromium")]), Identity("Chromium", "chromium"))
 
+    def test_name_from_a_window_is_marked_windowed(self):
+        self.assertTrue(default_namer(CATALOG, windows((10, "chromium"))).identify([process(10, "chromium")]).windowed)
+        self.assertFalse(default_namer(CATALOG, windows()).identify([process(10, "chromium")]).windowed)
+
     def test_window_class_without_entry_is_prettified(self):
         namer = default_namer(CATALOG, windows((10, "dev.zed.Zed")))
         self.assertEqual(namer.identify([process(10, "zed-editor")]).name, "Zed")

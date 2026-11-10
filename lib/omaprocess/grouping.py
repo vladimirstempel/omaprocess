@@ -23,7 +23,7 @@ class _Unit:
 
     @property
     def app_like(self) -> bool:
-        return Section.of(self.key) is Section.APPS
+        return self.identity.windowed or Section.of(self.key) is Section.APPS
 
 
 def group_processes(processes: Sequence[Process], namer: Namer, policy: ProtectionPolicy) -> list[ProcessGroup]:
@@ -88,11 +88,15 @@ def _group(units: list[_Unit], policy: ProtectionPolicy) -> ProcessGroup:
     identity = next((u.identity for u in units if u.identity.recognised), head.identity)
     return ProcessGroup(key=head.key, keys=tuple(u.key for u in units), identity=identity, processes=by_memory,
                         protected=any(policy.is_protected(p) for p in by_memory),
-                        placed=_section(head, identity))
+                        placed=_section(units, identity))
 
 
-def _section(head: _Unit, identity: Identity) -> Section:
-    """A helper Hyprland started with no window and no desktop entry is a service, not an application."""
+def _section(units: list[_Unit], identity: Identity) -> Section:
+    """A window makes an application, whatever started it. A helper Hyprland started
+    with no window and no desktop entry is a service."""
+    head = units[0]
+    if any(unit.identity.windowed for unit in units):
+        return Section.APPS
     if head.app_like and is_bare_command(head.key.value) and not identity.recognised:
         return Section.SYSTEM
     return Section.of(head.key)
