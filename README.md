@@ -1,5 +1,7 @@
 # OmaProcess
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/stempelv)
+
 See what is running on your Omarchy desktop by program, not by PID, and end
 the one that misbehaves. A bar icon opens a panel listing your programs with
 their real names and icons, "Chromium", "Zed", "Steam", instead of `chromium`
@@ -78,10 +80,6 @@ bin/omaprocess stop <unit>     # end a program
 bin/omaprocess term <pid>      # end one process
 bin/omaprocess kill <pid>      # force kill one process
 ```
-
-## Support
-
-OmaProcess is free. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/stempelv).
 
 ## License
 
