@@ -105,6 +105,8 @@ class Identity:
     icon: str = ""
     # True when a window or a desktop entry named it, not merely a unit or a process name.
     recognised: bool = field(default=False, compare=False)
+    # True when one of its processes owns a window.
+    windowed: bool = field(default=False, compare=False)
 
 
 @dataclass(frozen=True)

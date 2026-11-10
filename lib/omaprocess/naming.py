@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from typing import Iterator, Protocol, Sequence
 
 from .desktop import DesktopCatalog, DesktopEntry
@@ -77,10 +78,10 @@ class WindowClassRule:
         fallback = None
         for process, window_class, entry in self._windows_of(processes):
             if entry and entry.executable in (process.exe_name, process.comm):
-                return entry.identity()
+                return replace(entry.identity(), windowed=True)
             fallback = fallback or (entry.identity() if entry
                                     else Identity(_pretty_class(window_class), recognised=True))
-        return fallback
+        return replace(fallback, windowed=True) if fallback else None
 
     def _windows_of(self, processes: Sequence[Process]) -> Iterator[tuple[Process, str, DesktopEntry | None]]:
         for process in processes:

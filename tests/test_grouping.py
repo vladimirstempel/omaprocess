@@ -75,6 +75,18 @@ class GroupingTest(unittest.TestCase):
                                     "app-Hyprland-xfreerdp-d441c427.scope": Section.APPS,
                                     r"app-Hyprland-gtk\x2dlaunch-0cd72bd4.scope": Section.APPS})
 
+    def test_dbus_activated_unit_with_a_window_is_an_application(self):
+        # Telegram starts as a D-Bus service, in a unit that otherwise holds background services.
+        unit = "dbus-:1.1-org.telegram.desktop@0.service"
+        windowed = type("Namer", (), {"identify": lambda self, found: Identity(
+            "Telegram", "telegram", recognised=True, windowed=True)})()
+        [group] = group_processes([process(10, unit, 5, "Telegram")], windowed, POLICY)
+        self.assertEqual(group.section, Section.APPS)
+
+    def test_dbus_activated_unit_without_a_window_is_a_system_service(self):
+        [group] = group_processes([process(10, "dbus-:1.1-org.a11y.Bus@0.service", 5, "Bus")], StubNamer(), POLICY)
+        self.assertEqual(group.section, Section.SYSTEM)
+
     def test_group_with_the_shell_is_protected(self):
         groups = group_processes([process(1, "wayland-wm@hyprland.desktop.service", 1, "Hyprland"),
                                   process(2, "wayland-wm@hyprland.desktop.service", 1, "quickshell")],

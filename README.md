@@ -14,7 +14,8 @@ the whole program or a single process, always after a confirmation.
   count, memory and CPU. Programs are built from the systemd units Omarchy
   starts them in. Units that belong together are one row: Chromium and
   Electron apps split themselves over two units, and a terminal tab or an
-  agent session belongs to the app that started it.
+  agent session belongs to the app that started it. A program with a window
+  is always here, also when D-Bus started it (Telegram).
 - **System**: your session services (PipeWire, portals, Hyprland, …) and
   helpers that Hyprland starts without a window, collapsed by default. You can
   end them too, with an extra warning.
