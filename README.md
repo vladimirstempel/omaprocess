@@ -53,6 +53,14 @@ Optional keybinding in `~/.config/hypr/bindings.lua`:
 o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell shell toggle omaprocess")
 ```
 
+## Remove
+
+```bash
+omarchy plugin remove omaprocess --yes
+```
+
+This deletes the plugin folder and its bar widget. If you added the keybinding, delete that line too.
+
 ## Keys
 
 | Key | Action |
