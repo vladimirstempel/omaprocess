@@ -1,0 +1,26 @@
+{
+  "tooltip": "Процессы",
+  "search.placeholder": "Поиск программ, процессов или PID",
+  "section.apps": "ПРИЛОЖЕНИЯ",
+  "section.system": "СИСТЕМА (%1)",
+  "sort.memory": "Память",
+  "sort.cpu": "CPU",
+  "processes": {
+    "one": "%1 процесс",
+    "few": "%1 процесса",
+    "many": "%1 процессов",
+    "other": "%1 процесса"
+  },
+  "status.terminating": "Завершается…",
+  "status.stuck": "Не отвечает",
+  "action.terminate": "Завершить",
+  "action.kill": "Завершить принудительно",
+  "empty.loading": "Загрузка…",
+  "empty.nothing": "Нет совпадений для «%1»",
+  "error.busy": "Другое действие ещё выполняется",
+  "confirm.terminate.process": "Завершить %1 (PID %2)?",
+  "confirm.kill.process": "Принудительно завершить %1 (PID %2)? Данные не будут сохранены.",
+  "confirm.terminate.program": "Завершить %1? (%2)",
+  "confirm.kill.program": "Принудительно завершить %1? (%2) Данные не будут сохранены.",
+  "confirm.service": "Это служба сеанса: рабочий стол может перестать работать."
+}

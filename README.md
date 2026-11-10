@@ -8,11 +8,14 @@ the whole program or a single process, always after a confirmation.
 
 ## What it shows
 
-- **Applications**: everything you launched, grouped by the systemd scope
-  Omarchy starts each app in. One row per program with process count, memory
-  and CPU.
-- **System**: your session services (PipeWire, portals, Hyprland, …), collapsed
-  by default. You can end them too, with an extra warning.
+- **Applications**: everything you launched, one row per program with process
+  count, memory and CPU. Programs are built from the systemd units Omarchy
+  starts them in. Units that belong together are one row: Chromium and
+  Electron apps split themselves over two units, and a terminal tab or an
+  agent session belongs to the app that started it.
+- **System**: your session services (PipeWire, portals, Hyprland, …) and
+  helpers that Hyprland starts without a window, collapsed by default. You can
+  end them too, with an extra warning.
 - Only your own processes. Nothing owned by root or other users is listed or
   touched.
 
@@ -23,7 +26,8 @@ entry, then the name of its systemd unit, falling back to the process name.
 
 1. Press the terminate button on a row (or `x`) and confirm. The default
    choice is Cancel, so a stray Enter ends nothing.
-2. A program is stopped through `systemctl --user stop`, a single process gets
+2. A program is stopped through `systemctl --user stop`, for each of its units
+   after all of them passed the safety check. A single process gets
    `SIGTERM`, so it has a chance to save and exit cleanly.
 3. If it is still there after a few seconds, the row says "Not responding"
    and offers **Force kill** (`SIGKILL`), behind another confirmation.
@@ -57,6 +61,7 @@ o.bind("SUPER + CTRL + P", "Processes", "omarchy-shell shell toggle omaprocess")
 | `↓` / `j`, `↑` / `k` | move |
 | `Enter`, `Space`, `l` / `h` | expand / collapse |
 | `x` | terminate the selected program or process |
+| `s` | sort by memory or by CPU |
 | `/` | back to the search field |
 | `Esc` | clear the search, then close |
 
@@ -67,6 +72,13 @@ In the Omarchy bar settings for the widget:
 - **Panel width**, in the shell's spacing units (default 460)
 - **Refresh interval**, seconds between updates while the panel is open
   (default 2). Nothing is polled while it is closed.
+- **Sort by**, memory or CPU (default memory)
+
+## Languages
+
+The panel follows the language of Omarchy (Setup > Language). English and
+Russian ship in `i18n/`. To add a language, copy `i18n/en.json` to the
+Omarchy language code, for example `i18n/de.json`, and translate the values.
 
 ## From a terminal
 
@@ -75,9 +87,15 @@ its own:
 
 ```bash
 bin/omaprocess list | jq '.apps[] | {name, count, rss}'
-bin/omaprocess stop <unit>     # end a program
+bin/omaprocess stop <unit>...  # end a program, all of its units
 bin/omaprocess term <pid>      # end one process
 bin/omaprocess kill <pid>      # force kill one process
+```
+
+## Tests
+
+```bash
+make test
 ```
 
 ## License

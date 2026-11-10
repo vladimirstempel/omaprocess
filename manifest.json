@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "omaprocess",
   "name": "OmaProcess",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "stempelv",
   "description": "See running programs by name and end the one that misbehaves",
   "license": "MIT",
@@ -19,7 +19,8 @@
     "defaultSection": "right",
     "defaults": {
       "panelWidth": 460,
-      "refreshSeconds": 2
+      "refreshSeconds": 2,
+      "sortBy": "Memory"
     },
     "schema": [
       {
@@ -41,6 +42,14 @@
         "step": 1,
         "defaultValue": 2,
         "description": "Seconds between updates while the panel is open. Nothing is polled while it is closed."
+      },
+      {
+        "key": "sortBy",
+        "type": "enum",
+        "label": "Sort by",
+        "options": ["Memory", "CPU"],
+        "defaultValue": "Memory",
+        "description": "What puts a program at the top of the list. The panel can switch it with the s key."
       }
     ]
   }

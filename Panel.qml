@@ -7,9 +7,10 @@ import qs.Ui
 import "Model.js" as Model
 import "components"
 
-// Bar button plus popup. The popup coordinates: it owns view state (query,
-// expanded groups, cursor, pending terminations) and delegates I/O to Helper
-// and every decision about rows to Model.js.
+// Bar button plus popup. The panel owns the state (query, sort, expanded
+// groups, cursor, pending terminations) and delegates I/O to Helper and every
+// decision about rows to Model.js. The popup's content is built when the panel
+// first opens, so the functions that touch its items live inside it.
 Panel {
   id: root
   moduleName: "omaprocess"
@@ -21,6 +22,9 @@ Panel {
   implicitHeight: button.implicitHeight
 
   property var snapshot: ({ apps: [], system: [] })
+  property string query: ""
+  // The setting is where it starts; the panel can change it until the shell restarts.
+  property string sort: String(root.setting("sortBy", "Memory")).toLowerCase() === "cpu" ? "cpu" : "memory"
   property var expanded: ({})
   property bool systemOpen: false
   property string cursorId: ""
@@ -32,14 +36,29 @@ Panel {
   property var confirmRow: null
   property bool confirmForce: false
 
-  readonly property var rows: Model.buildRows(root.snapshot, { query: search.text, expanded: root.expanded, systemOpen: root.systemOpen })
+  readonly property var rows: Model.buildRows(root.snapshot, { query: root.query, sort: root.sort, expanded: root.expanded, systemOpen: root.systemOpen })
+  readonly property Item view: popup.loadedContent
+
+  Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
+
+  // What Model.js needs to write text. A new object on every language change,
+  // so the bindings that pass it on are evaluated again.
+  readonly property var l10n: {
+    var catalog = strings.strings
+    var decimal = I18n.decimal
+    return {
+      t: function (key) { return strings.t(key) },
+      tn: function (key, count) { return strings.tn(key, count) },
+      number: function (value, decimals) { return I18n.formatNumber(value, decimals) }
+    }
+  }
   readonly property int cursorIndex: Model.indexOfId(root.rows, root.cursorId)
   readonly property var cursorRow: root.cursorIndex >= 0 ? root.rows[root.cursorIndex] : null
 
   onOpenedChanged: {
     root.confirmRow = null
     if (!opened) return
-    search.text = ""
+    root.query = ""
     root.errorText = ""
     root.actionError = ""
     root.cursorId = ""
@@ -52,14 +71,12 @@ Panel {
     root.scrollToCursor()
   }
 
-  // Keyboard moves bring the cursor into view; refreshes and hover never scroll.
   function scrollToCursor() {
-    Qt.callLater(function () {
-      var item = rowRepeater.itemAt(root.cursorIndex)
-      if (!item) return
-      if (item.y < list.contentY) list.contentY = item.y
-      else if (item.y + item.height > list.contentY + list.height) list.contentY = item.y + item.height - list.height
-    })
+    if (root.view) root.view.scrollToCursor()
+  }
+
+  function toggleSort() {
+    root.sort = root.sort === "cpu" ? "memory" : "cpu"
   }
 
   function setExpanded(key, open) {
@@ -91,8 +108,7 @@ Panel {
     root.cursorId = row.id
     root.confirmForce = Model.pendingState(root.pending, row.id, Date.now()) === "stuck"
     root.confirmRow = row
-    confirm.selectedIndex = 0   // Enter defaults to Cancel
-    keyCatcher.forceActiveFocus()
+    if (root.view) root.view.beginConfirm()
   }
 
   function cancelTerminate() {
@@ -108,7 +124,7 @@ Panel {
       root.pendingActionId = row.id
       root.pending = Model.markPending(root.pending, row.id, Date.now())
     } else {
-      root.actionError = "Another action is still running"
+      root.actionError = root.l10n.t("error.busy")
     }
   }
 
@@ -116,8 +132,7 @@ Panel {
     root.snapshot = next
     root.pending = Model.prunePending(root.pending, next)
     root.errorText = ""
-    // Rows can vanish under the view; pull it back only if it now ends past the content.
-    Qt.callLater(function () { list.contentY = Math.max(0, Math.min(list.contentY, list.contentHeight - list.height)) })
+    if (root.view) root.view.clampScroll()
   }
 
   Helper {
@@ -163,7 +178,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: "󰍛"
-    tooltipText: "Processes"
+    tooltipText: root.l10n.t("tooltip")
     onPressed: function (b) { root.toggle() }
   }
 
@@ -173,13 +188,43 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: search
+    focusTarget: root.view ? root.view.searchField : null
     contentWidth: popup.fittedContentWidth(Style.space(root.setting("panelWidth", 460)))
-    contentHeight: popup.fittedContentHeight(Math.max(column.implicitHeight, root.confirmRow !== null ? Style.space(200) : 0))
+    contentHeight: popup.fittedContentHeight(Math.max(popup.loadedContentHeight, root.confirmRow !== null ? Style.space(200) : 0))
 
-    Item {
-      id: keyRoot
+    content: Item {
+      id: body
       anchors.fill: parent
+      implicitHeight: column.implicitHeight
+
+      readonly property Item searchField: search
+
+      // Keyboard moves bring the cursor into view; refreshes and hover never scroll.
+      function scrollToCursor() {
+        Qt.callLater(function () {
+          var item = rowRepeater.itemAt(root.cursorIndex)
+          if (!item) return
+          if (item.y < list.contentY) list.contentY = item.y
+          else if (item.y + item.height > list.contentY + list.height) list.contentY = item.y + item.height - list.height
+        })
+      }
+
+      // Rows can vanish under the view; pull it back only if it now ends past the content.
+      function clampScroll() {
+        Qt.callLater(function () { list.contentY = Math.max(0, Math.min(list.contentY, list.contentHeight - list.height)) })
+      }
+
+      function beginConfirm() {
+        confirm.selectedIndex = 0   // Enter defaults to Cancel
+        keyCatcher.forceActiveFocus()
+      }
+
+      // The content outlives a close: start the next open with an empty search.
+      Connections {
+        target: root
+        function onOpenedChanged() { if (root.opened) search.text = "" }
+      }
+      Component.onCompleted: Qt.callLater(function () { search.forceActiveFocus() })
 
       // The catcher is blocked while confirming; its unhandled keys bubble here.
       Keys.onPressed: function (event) {
@@ -197,7 +242,10 @@ Panel {
         onActivateRequested: root.activate(root.cursorRow)
         onDeleteRequested: root.askTerminate(root.cursorRow)
         onCloseRequested: root.close()
-        onTextKey: function (t) { if (t === "/") search.forceActiveFocus() }
+        onTextKey: function (t) {
+          if (t === "/") search.forceActiveFocus()
+          else if (t === "s" || t === "S") root.toggleSort()
+        }
 
         Column {
           id: column
@@ -210,8 +258,9 @@ Panel {
           TextField {
             id: search
             width: parent.width
-            placeholderText: "Search programs, processes or PIDs"
+            placeholderText: root.l10n.t("search.placeholder")
             foreground: root.bar.foreground
+            onTextChanged: root.query = text
             Keys.onPressed: function (event) {
               if (event.key === Qt.Key_Escape) {
                 if (search.text !== "") search.text = ""
@@ -222,6 +271,23 @@ Panel {
                 if (root.cursorIndex < 0) root.moveCursor(1)
                 event.accepted = true
               }
+            }
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: sortChoice.implicitHeight
+
+            ButtonGroup {
+              id: sortChoice
+              anchors.right: parent.right
+              options: [{ value: "memory", label: root.l10n.t("sort.memory") }, { value: "cpu", label: root.l10n.t("sort.cpu") }]
+              value: root.sort
+              focusable: false
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              fontSize: Style.font.caption
+              onChanged: function (value) { root.sort = value }
             }
           }
 
@@ -251,7 +317,7 @@ Panel {
                   id: slot
                   required property int index
                   // rows can shrink a moment before the count does
-                  readonly property var modelData: root.rows[slot.index] || ({ id: "", type: "section", title: "" })
+                  readonly property var modelData: root.rows[slot.index] || ({ id: "", type: "section" })
                   width: listColumn.width
                   height: loader.item ? loader.item.implicitHeight : 0
 
@@ -261,7 +327,7 @@ Panel {
                   Component {
                     id: sectionRow
                     PanelSectionHeader {
-                      text: slot.modelData.title
+                      text: root.l10n.t("section.apps")
                       foreground: root.bar.foreground
                       fontFamily: root.bar.fontFamily
                     }
@@ -271,6 +337,7 @@ Panel {
                     GroupRow {
                       entry: slot.modelData
                       bar: root.bar
+                      l10n: root.l10n
                       selected: slot.selected
                       status: slot.status
                       onPointed: root.cursorId = slot.modelData.id
@@ -283,6 +350,7 @@ Panel {
                     ProcessRow {
                       entry: slot.modelData
                       bar: root.bar
+                      l10n: root.l10n
                       selected: slot.selected
                       status: slot.status
                       onPointed: root.cursorId = slot.modelData.id
@@ -294,6 +362,7 @@ Panel {
                     ToggleRow {
                       entry: slot.modelData
                       bar: root.bar
+                      l10n: root.l10n
                       selected: slot.selected
                       onPointed: root.cursorId = slot.modelData.id
                       onActivated: root.activate(slot.modelData)
@@ -317,7 +386,7 @@ Panel {
             width: parent.width
             visible: root.rows.length === 0 && root.errorText === ""
             textFormat: Text.PlainText
-            text: search.text !== "" ? "Nothing matches “" + search.text + "”" : "Loading…"
+            text: search.text !== "" ? Model.fill(root.l10n.t("empty.nothing"), [search.text]) : root.l10n.t("empty.loading")
             color: Qt.darker(root.bar.foreground, 1.5)
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.bodySmall
@@ -341,8 +410,8 @@ Panel {
         anchors.fill: parent
         z: 10
         opened: root.confirmRow !== null
-        message: root.confirmRow ? Model.confirmMessage(root.confirmRow, root.confirmForce) : ""
-        confirmText: root.confirmForce ? "Force kill" : "Terminate"
+        message: root.confirmRow ? Model.confirmMessage(root.confirmRow, root.confirmForce, root.l10n) : ""
+        confirmText: root.l10n.t(root.confirmForce ? "action.kill" : "action.terminate")
         fontFamily: root.bar.fontFamily
         onCanceled: root.cancelTerminate()
         onConfirmed: root.confirmTerminate()

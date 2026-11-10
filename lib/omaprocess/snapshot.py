@@ -14,6 +14,7 @@ def snapshot(groups: Sequence[ProcessGroup], policy: ProtectionPolicy) -> dict:
 def _group(group: ProcessGroup, policy: ProtectionPolicy) -> dict:
     return {
         "key": str(group.key),
+        "keys": [str(key) for key in group.keys],
         "unit": str(group.key) if group.key.is_unit else "",
         "name": group.identity.name,
         "icon": group.identity.icon,

@@ -51,6 +51,20 @@ class TerminatorTest(unittest.TestCase):
         self.assertEqual(recorder.commands, [["systemctl", "--user", "stop", "--no-block", "--", UNIT]])
         self.assertEqual(recorder.signals, [])
 
+    def test_program_of_several_units_is_stopped_unit_by_unit(self):
+        self.proc.add(12, "chromium", group="app-org.chromium.Chromium-12.scope")
+        recorder = Recorder()
+        self.terminator(recorder).stop_group(GroupKey(UNIT), GroupKey("app-org.chromium.Chromium-12.scope"),
+                                             GroupKey("app-gone.scope"))
+        self.assertEqual([command[-1] for command in recorder.commands],
+                         [UNIT, "app-org.chromium.Chromium-12.scope"])
+
+    def test_one_protected_unit_stops_none_of_the_program(self):
+        recorder = Recorder()
+        with self.assertRaisesRegex(Refused, "protected"):
+            self.terminator(recorder).stop_group(GroupKey(UNIT), GroupKey("wayland-wm@hyprland.desktop.service"))
+        self.assertEqual((recorder.commands, recorder.signals), ([], []))
+
     def test_kill_group_uses_systemctl_kill(self):
         recorder = Recorder()
         self.terminator(recorder).kill_group(GroupKey(UNIT))

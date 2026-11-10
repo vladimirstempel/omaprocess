@@ -10,6 +10,7 @@ CursorSurface {
 
   required property var entry
   required property QtObject bar
+  required property var l10n
   property bool selected: false
   property string status: ""      // "", "terminating", "stuck"
 
@@ -92,9 +93,9 @@ CursorSurface {
       Text {
         width: parent.width
         textFormat: Text.PlainText
-        text: row.status === "terminating" ? "Terminating…"
-            : row.status === "stuck" ? "Not responding"
-            : Model.groupCaption(row.group)
+        text: row.status === "terminating" ? row.l10n.t("status.terminating")
+            : row.status === "stuck" ? row.l10n.t("status.stuck")
+            : Model.groupCaption(row.group, row.l10n)
         color: row.status === "stuck" ? Color.urgent : Qt.darker(row.bar.foreground, 1.4)
         font.family: row.bar.fontFamily
         font.pixelSize: Style.font.caption
@@ -108,7 +109,7 @@ CursorSurface {
       anchors.verticalCenter: parent.verticalCenter
       visible: Model.canTerminate(row.entry)
       iconText: row.status === "stuck" ? "󰚌" : "󰅙"
-      tooltipText: row.status === "stuck" ? "Force kill" : "Terminate"
+      tooltipText: row.l10n.t(row.status === "stuck" ? "action.kill" : "action.terminate")
       foreground: row.bar.foreground
       hoverColor: Color.urgent
       fontFamily: row.bar.fontFamily

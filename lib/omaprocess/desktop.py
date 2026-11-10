@@ -19,7 +19,7 @@ class DesktopEntry:
     hidden: bool = False
 
     def identity(self) -> Identity:
-        return Identity(self.name, self.icon)
+        return Identity(self.name, self.icon, recognised=True)
 
 
 def parse_desktop_file(path: Path) -> DesktopEntry | None:

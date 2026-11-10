@@ -41,7 +41,7 @@ def _parser() -> argparse.ArgumentParser:
     for name, handler, target in [("stop", _stop, "key"), ("kill-unit", _kill_unit, "key"),
                                   ("term", _term, "pid"), ("kill", _kill, "pid")]:
         command = commands.add_parser(name, help=f"end a {'program' if target == 'key' else 'process'}")
-        command.add_argument("target", metavar=target.upper())
+        command.add_argument("target", metavar=target.upper(), **({"nargs": "+"} if target == "key" else {}))
         command.set_defaults(handler=handler)
     return parser
 
@@ -75,12 +75,12 @@ def _terminator(args: argparse.Namespace) -> Terminator:
 
 
 def _stop(args: argparse.Namespace, env: Mapping[str, str]) -> int:
-    _terminator(args).stop_group(GroupKey.parse(args.target))
+    _terminator(args).stop_group(*(GroupKey.parse(key) for key in args.target))
     return 0
 
 
 def _kill_unit(args: argparse.Namespace, env: Mapping[str, str]) -> int:
-    _terminator(args).kill_group(GroupKey.parse(args.target))
+    _terminator(args).kill_group(*(GroupKey.parse(key) for key in args.target))
     return 0
 
 

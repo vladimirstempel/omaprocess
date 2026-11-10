@@ -13,8 +13,9 @@ _WRAPPERS = frozenset({"bash", "sh", "zsh", "fish", "dash", "env", "uwsm", "syst
 _WORD = re.compile(r"[A-Za-z][A-Za-z0-9]*")
 _ESCAPED = re.compile(r"\\x([0-9a-fA-F]{2})")
 # What a unit is called after, in the order the shapes are tried.
+_HYPRLAND_COMMAND = re.compile(r"app-Hyprland-(?P<hint>.+)-[0-9a-f]{8}\.scope")
 _UNIT_HINTS = (
-    re.compile(r"app-Hyprland-(?P<hint>.+)-[0-9a-f]{8}\.scope"),       # a command Hyprland started
+    _HYPRLAND_COMMAND,                                                  # a command Hyprland started
     re.compile(r"app-(?P<hint>.+?)(-\d+)?\.scope"),                     # app-<desktop id>-<pid>.scope
     re.compile(r"app-(?P<hint>.+?)(@[^@]*)?\.service"),                 # app-<desktop id>@autostart.service
     re.compile(r"dbus-:[\d.]+-(?P<hint>.+)@\d+\.service"),              # D-Bus activated
@@ -32,7 +33,12 @@ def _meaningful(processes: Sequence[Process]) -> list[Process]:
 
 
 def _title(name: str) -> str:
-    return name[:1].upper() + name[1:]
+    """Capitalises a plain word. A compound name such as xdg-desktop-portal reads better as it is."""
+    return name[:1].upper() + name[1:] if _WORD.fullmatch(name) else name
+
+
+def _unescape(text: str) -> str:
+    return _ESCAPED.sub(lambda m: chr(int(m.group(1), 16)), text)
 
 
 def unit_hint(unit: str) -> str:
@@ -40,8 +46,14 @@ def unit_hint(unit: str) -> str:
     for shape in _UNIT_HINTS:
         match = shape.fullmatch(unit)
         if match:
-            return _ESCAPED.sub(lambda m: chr(int(m.group(1), 16)), match.group("hint"))
+            return _unescape(match.group("hint"))
     return ""
+
+
+def is_bare_command(unit: str) -> bool:
+    """A command Hyprland started directly, such as an exec-once helper, not through an app launcher."""
+    match = _HYPRLAND_COMMAND.fullmatch(unit)
+    return match is not None and _unescape(match.group("hint")) not in _WRAPPERS
 
 
 def _pretty_class(window_class: str) -> str:
@@ -66,7 +78,8 @@ class WindowClassRule:
         for process, window_class, entry in self._windows_of(processes):
             if entry and entry.executable in (process.exe_name, process.comm):
                 return entry.identity()
-            fallback = fallback or (entry.identity() if entry else Identity(_pretty_class(window_class)))
+            fallback = fallback or (entry.identity() if entry
+                                    else Identity(_pretty_class(window_class), recognised=True))
         return fallback
 
     def _windows_of(self, processes: Sequence[Process]) -> Iterator[tuple[Process, str, DesktopEntry | None]]:

@@ -71,8 +71,8 @@ class NamerTest(unittest.TestCase):
         named = {unit: namer.identify([process(1, "xdg-desktop-por", group=unit)]).name for unit in [
             "xdg-desktop-portal-hyprland.service", "wayland-session-bindpid@1329.service",
             "wayland-wm@hyprland.desktop.service", r"app-Hyprland-omarchy\x2dmonitor\x2dwatch-9a100c1b.scope"]}
-        self.assertEqual(list(named.values()), ["Xdg-desktop-portal-hyprland", "Wayland-session-bindpid",
-                                                "Hyprland", "Omarchy-monitor-watch"])
+        self.assertEqual(list(named.values()), ["xdg-desktop-portal-hyprland", "wayland-session-bindpid",
+                                                "Hyprland", "omarchy-monitor-watch"])
 
     def test_unit_hint(self):
         hints = {
